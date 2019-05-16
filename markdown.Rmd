@@ -1,0 +1,241 @@
+---
+title: "Exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm records to answer questions on casualties, fatalities and most damage caused by events in the past"
+author: "Glenn Matias"
+date: "May 16, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Synopsis
+This case study was able to determine that the following events are the major leading causes of fatality: TSTM WIND, TORNADO, RIP CURRENT, LIGHTNING, HIGH WIND, HEAT, FLOOD, FLASH FLOOD, EXCESSIVE HEAT and AVALANCHE. 
+
+The following events are the major leading causes of injury: TORNADO, TSTM WIND, FLOOD, EXCESSIVE HEAT, LIGHTNING, HEAT, ICE STORM, FLASH FLOOD, THUNDERSTORM WIND and HAIL.
+
+While the major leading property and crop damages events are: TORNADOES, TSTM WIND, HAIL, WILD FIRES, HAILSTORM, RIVER FLOODING, HIGH WINDS/COLD, HURRICANE OPAL/HIGHWINDS, MAJOR FLOOD, WINTER STORM HIGH WINDS, HURRICANE EMILY and EROSION/CSTL Flood.
+
+## Introduction
+
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+
+## Preprocessing
+
+The data for this assignment come in the form of a comma-separated-value file compressed via the bzip2 algorithm to reduce its size. You can download the file from the course web site: https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2
+
+Here is the documentation for the dataset: https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf
+
+### Data Processing
+
+**Importing of required libraries**
+
+```{r results='hide', message=FALSE, warning=FALSE}
+library("ggplot2")
+library("dplyr")
+```
+
+**Disabling scientific notation**
+
+```{r results='hide', message=FALSE, warning=FALSE}
+options(scipen = 999)
+```
+
+**Extracting the data**
+```{r eval = FALSE }
+unzip(zipfile = "./repdata_data_StormData.csv")
+```
+
+**Loading the data**
+
+```{r cache = TRUE}
+dataset = read.table("repdata_data_stormData.csv", sep = ",", skip=1)
+```
+
+**Setting the column names**
+
+```{r }
+colnames(dataset) = c("STATE__","BGN_DATE","BGN_TIME","TIME_ZONE","COUNTY","COUNTYNAME","STATE","EVTYPE","BGN_RANGE","BGN_AZI","BGN_LOCATI","END_DATE","END_TIME","COUNTY_END","COUNTYENDN","END_RANGE","END_AZI","END_LOCATI","LENGTH","WIDTH","F","MAG","FATALITIES","INJURIES","PROPDMG","PROPDMGEXP","CROPDMG","CROPDMGEXP","WFO","STATEOFFIC","ZONENAMES","LATITUDE","LONGITUDE","LATITUDE_E","LONGITUDE_","REMARKS","REFNUM")
+```
+
+**Get rows of data with fatalities greater than 0**
+
+```{r}
+subsetFatality = subset(dataset,dataset$FATALITIES>0)
+```
+
+
+**Tally the fatalities by EVTYPE**
+
+```{r}
+fatalityTallyDataset = subsetFatality %>% group_by(EVTYPE) %>% summarise('tally' = sum(FATALITIES, rm.na = TRUE))
+```
+
+**Get top 10 EVTYPE based on fatalities**
+
+```{r}
+fatalityTallyDataset = head(arrange(fatalityTallyDataset, desc(fatalityTallyDataset$tally)), 10)
+```
+
+
+**Get rows of data with injuries greater than 0**
+```{r}
+
+subsetInjury = subset(dataset,dataset$INJURIES>0)
+```
+**Tally the injuries by EVTYPE**
+
+```{r}
+injuryTallyDataset = subsetInjury %>% group_by(EVTYPE) %>% summarise("tally" = sum(INJURIES))
+```
+**Get top 10 EVTYPE based on injuries**
+```{r}
+topTenInjuryTallyDataset = head(arrange(injuryTallyDataset,desc(injuryTallyDataset$tally)),10)
+```
+
+### ASSESSING DAMAGE COSTS  
+
+This section will process the necessary data to answer the question:  Across the United States, which types of events have the greatest economic consequences?
+
+**Set column to contain Property Damages cost  
+Initialize the column to have 0 as its value.**
+```{r}
+dataset$propertyDamageComponent = 0
+```
+**Convert Property Damages with "K" or "k" as its exponent**
+
+If the PROPDMGEXP is equal to "K" or "k", we assume that we should multiply the PROPDMG value by 1,000.  
+
+```{r}
+dataset$propertyDamageComponent =  ifelse(dataset$PROPDMGEXP ==  'K' | dataset$PROPDMGEXP ==  'k', dataset$PROPDMG * 1000, dataset$propertyDamageComponent)
+```
+**Convert Property Damages with "M" or "m" as its exponent**
+
+If the PROPDMGEXP is equal to "M" or "m", we assume that we should multiply the PROPDMG value by 1,000,000. 
+
+```{r}
+dataset$propertyDamageComponent = ifelse(dataset$PROPDMGEXP ==  'M' | dataset$PROPDMGEXP ==  'm', dataset$PROPDMG * 1000000, dataset$propertyDamageComponent)
+```
+
+**Convert Property Damages with "B" or "b" as its exponent**
+
+If the PROPDMGEXP is equal to "B" or "b", we assume that we should multiply the PROPDMG value by 1,000,000,000. 
+
+```{r}
+dataset$propertyDamageComponent = ifelse(dataset$PROPDMGEXP ==  'B' | dataset$PROPDMGEXP ==  'b', dataset$PROPDMG * 1000000000, dataset$propertyDamageComponent)
+```
+
+**Convert Property Damages with "0" or "1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" as its exponent**
+
+If the PROPDMGEXP is equal to "0" or "1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" , we assume that we should raise the PROPDMG to the PROPDMGEXP value.
+
+```{r results='hide', message=FALSE, warning=FALSE}
+dataset$propertyDamageComponent = ifelse(!(dataset$PROPDMGEXP ==  'B' | dataset$PROPDMGEXP ==  'b' | dataset$PROPDMGEXP ==  'm' | dataset$PROPDMGEXP ==  'M' | dataset$PROPDMGEXP ==  'k' | dataset$PROPDMGEXP ==  'K') & (as.numeric(as.character(dataset$PROPDMGEXP)) > 0 & as.numeric(as.character(dataset$PROPDMGEXP))) <=  8, dataset$PROPDMG^as.numeric(as.character(dataset$PROPDMGEXP)), dataset$propertyDamageComponent)
+```
+
+**Convert Property Damages with "+" or "-" or "?" as its exponent**
+
+If the PROPDMGEXP is equal to "+" or "-" or "?", we assume that we should manipulate the PROPDMG value.
+
+```{r}
+
+dataset$propertyDamageComponent = ifelse((dataset$PROPDMGEXP == "+" | dataset$PROPDMGEXP == "-" | dataset$PROPDMGEXP == "?"), dataset$PROPDMG, dataset$propertyDamageComponent)
+```
+
+
+
+**Set column to contain Crop Damage costs**
+Initialize the column to have 0 as its value.  
+```{r}
+dataset$cropDamageComponent = 0
+```
+**Convert Crop Damages with "K" or "k" as its exponent**
+If the CROPDMGEXP is equal to "K" or "k", we assume that we should multiply the CROPDMG value by 1,000.
+```{r}
+dataset$cropDamageComponent =  ifelse(dataset$CROPDMGEXP ==  'K' | dataset$CROPDMGEXP ==  'k', dataset$CROPDMG * 1000, dataset$cropDamageComponent)
+```
+**Convert Crop Damages with "M" or "m" as its exponent**
+If the CROPDMGEXP is equal to "M" or "m", we assume that we should multiply the CROPDMG value by 1,000,000
+```{r}
+dataset$cropDamageComponent = ifelse(dataset$CROPDMGEXP ==  'M' | dataset$CROPDMGEXP ==  'm', dataset$CROPDMG * 1000000, dataset$cropDamageComponent)
+```
+
+**Convert Crop Damages with "B" or "b" as its exponent**
+If the CROPDMGEXP is equal to "B" or "b", we assume that we should multiply the CROPDMG value by 1,000,000,000.
+```{r}
+dataset$cropDamageComponent = ifelse(dataset$CROPDMGEXP ==  'B' | dataset$CROPDMGEXP ==  'b', dataset$CROPDMG * 1000000000, dataset$cropDamageComponent)
+```
+
+**Convert Crop Damages with "0" or "1" or "2" or "3" or "4" or "5" or "6" or "7" or "8" or "9" as its exponent**
+If the PROPDMGEXP is equal to "0" or "2", we assume that we should raise the PROPDMG to the PROPDMGEXP value.
+```{r results='hide', message=FALSE, warning=FALSE}
+
+dataset$cropDamageComponent = ifelse(!(dataset$CROPDMGEXP ==  'B' | dataset$CROPDMGEXP ==  'b' | dataset$CROPDMGEXP ==  'm' | dataset$CROPDMGEXP ==  'M' | dataset$CROPDMGEXP ==  'k' | dataset$CROPDMGEXP ==  'K') & (dataset$CROPDMGEXP == "0" | dataset$CROPDMGEXP == "2"), dataset$CROPDMG^as.numeric(as.character(dataset$CROPDMGEXP)), dataset$cropDamageComponent)
+```
+
+**Convert Crop Damages with "+" or "-" or "?" as its exponent**
+If the CROPDMGEXP is equal to "+" or "-" or "?", we assume that we should manipulate the CROPDMG value.
+
+```{r}
+
+dataset$cropDamageComponent = ifelse((dataset$CROPDMGEXP == "+" | dataset$CROPDMGEXP == "-" | dataset$CROPDMGEXP == "?"), dataset$CROPDMG, dataset$cropDamageComponent)
+```
+
+
+**Get the sum of Property Damage Costs grouped by type**
+```{r}
+tallyByTypePropertyDamage = dataset %>% group_by(EVTYPE) %>% summarise("tally" = sum(propertyDamageComponent, rm.na =TRUE))
+```
+**Get the sum of Crop Damage Costs grouped by type**
+```{r}
+tallyByTypeCropDamage = dataset %>% group_by(EVTYPE) %>% summarise("tally" = sum(cropDamageComponent, rm.na = TRUE))
+```
+
+**Rename the column names of aggregated data**
+```{r}
+
+colnames(tallyByTypePropertyDamage) = c('EVTYPE','propertydamage')
+colnames(tallyByTypeCropDamage) = c('EVTYPE','cropdamage')
+```
+
+**Merge the two Damage Cost datasets**
+
+```{r}
+tallyByTypeMerged = merge(tallyByTypePropertyDamage, tallyByTypeCropDamage, by = "EVTYPE")
+```
+**Create a column to contain the summed up Crop Damages and Property Damages per grouped per type**
+```{r}
+tallyByTypeMerged$totalDamage = tallyByTypeMerged$cropdamage + tallyByTypeMerged$propertydamage
+```
+**Get only the Top 10 event type that caused the most damage cost **
+```{r}
+tallyByTypeMerged = head(arrange(tallyByTypeMerged, desc(tallyByTypeMerged$totalDamage, 10)), 10)
+
+```
+
+### Results
+
+#### Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+**Results for the top 10 Event Type that caused the most number of fatalities**
+
+```{r results='hide', message=FALSE, warning=FALSE}
+ggplot(fatalityTallyDataset,aes(x= reorder(tally, EVTYPE), y=EVTYPE, group = 1)) + ggtitle("Number of fatalities based on top 10 events") + geom_bar(stat="identity")
+```
+
+**Results for the top 10 Event Type that caused the most number of injuries**
+```{r results='hide', message=FALSE, warning=FALSE}
+ggplot(data=topTenInjuryTallyDataset, aes(x=reorder(EVTYPE, -tally), y=tally,  group = 1)) +
+    geom_bar(stat="identity") + coord_flip() +  ggtitle("Number of injuries based on top 10 events")
+```
+
+#### Across the United States, which types of events have the greatest economic consequences?
+
+**Results for the top 10 Event Type that caused the greatest economic consequences**
+
+```{r}
+ggplot(tallyByTypeMerged, aes(x = reorder(EVTYPE, totalDamage), y = totalDamage)) + coord_flip() + 
+    geom_bar(stat = "identity")  +labs(title="Total damage cost based on Crop and Property Damages",y ="Damage cost (Crop Damages + Property Damages)(in $)", x = "Event Type")
+```
